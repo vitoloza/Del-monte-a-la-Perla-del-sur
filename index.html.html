@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego: Del Monte a la Perla del Sur</title>
+    <!-- Tailwind CSS desde CDN para estilos infantiles y atractivos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Fredoka', cursive, sans-serif;
+            background-color: #e0f2fe;
+        }
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+        .player-chip {
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div id="app" class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-6 border-4 border-green-400">
+
+        <!-- CONFIGURACIÓN INICIAL DE JUGADORES -->
+        <div id="setup-screen" class="text-center">
+            <h1 class="text-3xl font-bold text-green-700 mb-2">🌳 Del Monte a la Perla del Sur 💎</h1>
+            <p class="text-gray-600 mb-6 text-lg">Un recorrido interactivo sobre la historia y naturaleza de El Colorado</p>
+
+            <div class="bg-amber-50 p-6 rounded-2xl border-2 border-amber-200 mb-6">
+                <label for="num-players" class="block text-xl font-semibold text-amber-800 mb-3">
+                    ¿Cuántos jugadores o equipos van a jugar? (1 a 16):
+                </label>
+                <div class="flex justify-center items-center gap-4">
+                    <input type="number" id="num-players" min="1" max="16" value="2" 
+                        class="w-24 text-center text-2xl font-bold p-3 border-2 border-amber-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <button onclick="startGame()" 
+                        class="bg-green-500 hover:bg-green-600 text-white font-bold text-xl px-8 py-3 rounded-xl shadow-lg transform transition active:scale-95">
+                        🚀 ¡Comenzar Aventura!
+                    </button>
+                </div>
+            </div>
+            
+            <div class="text-sm text-gray-500 bg-blue-50 p-4 rounded-xl">
+                🎒 <b>Destinado a 2° Grado:</b> Avanza casilleros respondiendo preguntas sobre la historia del monte, el río Bermejo y el nacimiento de la Perla del Sur.
+            </div>
+        </div>
+
+        <!-- PANTALLA DE JUEGO PRINCIPAL -->
+        <div id="game-screen" class="hidden">
+            <!-- Encabezado de Turno -->
+            <div class="flex flex-col md:flex-row justify-between items-center bg-blue-100 p-4 rounded-2xl mb-6 border-2 border-blue-300">
+                <div class="flex items-center gap-3">
+                    <span class="text-xl font-bold text-blue-900">Turno de:</span>
+                    <div id="current-player-badge" class="px-4 py-2 rounded-xl text-white font-bold text-xl shadow">
+                        Jugador 1
+                    </div>
+                </div>
+                <div id="dice-container" class="mt-3 md:mt-0 flex items-center gap-4">
+                    <button id="roll-btn" onclick="rollDice()" 
+                        class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg px-6 py-2 rounded-xl shadow transform transition active:scale-95">
+                        🎲 Tirar Dado
+                    </button>
+                    <div id="dice-result" class="text-3xl font-bold text-amber-700 w-12 text-center">-</div>
+                </div>
+            </div>
+
+            <!-- Tablero de Juego (15 Casilleros) -->
+            <div class="board-grid mb-6 bg-green-50 p-4 rounded-2xl border-2 border-green-200" id="board">
+                <!-- Se genera dinámicamente -->
+            </div>
+
+            <!-- Modal de Pregunta -->
+            <div id="question-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-3xl p-6 max-w-lg w-full border-4 border-amber-400 shadow-2xl text-center">
+                    <div class="text-sm uppercase tracking-wide font-bold text-amber-600 mb-2">Pregunta para avanzar 🌟</div>
+                    <h2 id="question-text" class="text-xl font-bold text-gray-800 mb-6"></h2>
+                    <div id="options-container" class="flex flex-col gap-3">
+                        <!-- Botones de Opciones -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mensaje de Feedback -->
+            <div id="feedback-msg" class="hidden p-4 rounded-xl text-center font-bold text-lg mb-4"></div>
+        </div>
+
+        <!-- PANTALLA DE GANADOR -->
+        <div id="win-screen" class="hidden text-center py-8">
+            <h1 class="text-4xl font-bold text-yellow-500 mb-4">🎉 ¡Felicidades! 🎉</h1>
+            <p id="winner-text" class="text-2xl font-bold text-gray-800 mb-6"></p>
+            <p class="text-gray-600 mb-8 text-lg">¡Has completado el camino desde el monte originario hasta llegar a la Perla del Sur!</p>
+            <button onclick="resetGame()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl px-8 py-3 rounded-xl shadow-lg">
+                🔄 Jugar de Nuevo
+            </button>
+        </div>
+
+    </div>
+
+    <!-- LÓGICA DEL JUEGO -->
+    <script>
+        const colors = [
+            '#ef4444', '#3b82f6', '#10b981', '#f59e0b', 
+            '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
+            '#06b6d4', '#84cc16', '#6366f1', '#d97706',
+            '#4338ca', '#be123c', '#047857', '#374151'
+        ];
+
+        const boardNodes = [
+            "Inicio: El Monte Natiivo", "Río Bermejo", "Llegada de pobladores", 
+            "El Hachero", "Primeras Casas", "Flora y Fauna", 
+            "Puente Libertad", "La Escuela", "Crece el Pueblo", 
+            "Las Plazas", "Naturaleza y Trabajo", "Costanera", 
+            "Fiesta del Pueblo", "El Colorado", "Perla del Sur 💎"
+        ];
+
+        const questions = [
+            {
+                q: "¿Qué había al principio donde hoy está nuestra ciudad?",
+                options: ["Un gran monte nativo con árboles y animales", "Un centro comercial lleno de autos", "Una pista de aviones"],
+                correct: 0
+            },
+            {
+                q: "¿A orillas de qué importante río se encuentra la zona de El Colorado?",
+                options: ["Río Paraná", "Río Bermejo", "Río de la Plata"],
+                correct: 1
+            },
+            {
+                q: "Los primeros habitantes transformaron el monte con mucho...",
+                options: ["Enojó y tristeza", "Trabajo y esfuerzo", "Descanso y juegos"],
+                correct: 1
+            },
+            {
+                q: "¿Con qué nombre afectuoso se conoce a la ciudad de El Colorado?",
+                options: ["La Ciudad de la Nieve", "La Perla del Sur", "La Isla Dorada"],
+                correct: 1
+            },
+            {
+                q: "¿Qué debemos hacer para cuidar la naturaleza de nuestro lugar?",
+                options: ["Tirar basura en el río", "Plantar árboles y cuidar los animales", "Cortar todas las plantas"],
+                correct: 1
+            }
+        ];
+
+        let players = [];
+        let currentPlayerIndex = 0;
+        let pendingMove = 0;
+
+        function startGame() {
+            const countInput = document.getElementById('num-players');
+            let count = parseInt(countInput.value);
+            if (isNaN(count) || count < 1) count = 1;
+            if (count > 16) count = 16;
+
+            players = [];
+            for (let i = 0; i < count; i++) {
+                players.push({
+                    id: i + 1,
+                    name: `Jugador ${i + 1}`,
+                    color: colors[i],
+                    position: 0
+                });
+            }
+
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            renderBoard();
+            updateTurnUI();
+        }
+
+        function renderBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+
+            boardNodes.forEach((name, idx) => {
+                const tile = document.createElement('div');
+                tile.className = `relative min-h-[90px] p-2 rounded-xl border-2 flex flex-col justify-between items-center text-center ${idx === 0 ? 'bg-green-200 border-green-400' : idx === 14 ? 'bg-amber-200 border-amber-400' : 'bg-white border-blue-200'}`;
+
+                tile.innerHTML = `
+                    <span class="text-xs font-bold text-gray-500 self-start">${idx + 1}</span>
+                    <span class="text-xs font-semibold text-gray-800 leading-tight">${name}</span>
+                    <div id="tile-players-${idx}" class="flex flex-wrap gap-1 justify-center mt-1"></div>
+                `;
+                boardEl.appendChild(tile);
+            });
+
+            updatePlayerPositions();
+        }
+
+        function updatePlayerPositions() {
+            // Limpiar fichas
+            for (let i = 0; i < boardNodes.length; i++) {
+                const container = document.getElementById(`tile-players-${i}`);
+                if (container) container.innerHTML = '';
+            }
+
+            // Dibujar fichas
+            players.forEach(p => {
+                const container = document.getElementById(`tile-players-${p.position}`);
+                if (container) {
+                    const chip = document.createElement('div');
+                    chip.className = 'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md border border-white';
+                    chip.style.backgroundColor = p.color;
+                    chip.innerText = p.id;
+                    chip.title = p.name;
+                    container.appendChild(chip);
+                }
+            });
+        }
+
+        function updateTurnUI() {
+            const p = players[currentPlayerIndex];
+            const badge = document.getElementById('current-player-badge');
+            badge.innerText = p.name;
+            badge.style.backgroundColor = p.color;
+            document.getElementById('dice-result').innerText = '-';
+            document.getElementById('roll-btn').disabled = false;
+        }
+
+        function rollDice() {
+            document.getElementById('roll-btn').disabled = true;
+            const dice = Math.floor(Math.random() * 3) + 1; // Avanza de 1 a 3 para 2° grado
+            document.getElementById('dice-result').innerText = dice;
+            pendingMove = dice;
+
+            setTimeout(() => {
+                showQuestion();
+            }, 600);
+        }
+
+        function showQuestion() {
+            const randomQ = questions[Math.floor(Math.random() * questions.length)];
+            document.getElementById('question-text').innerText = randomQ.q;
+            
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            randomQ.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold p-3 rounded-xl border border-blue-200 text-left transition';
+                btn.innerText = opt;
+                btn.onclick = () => handleAnswer(idx === randomQ.correct);
+                optionsContainer.appendChild(btn);
+            });
+
+            document.getElementById('question-modal').classList.remove('hidden');
+        }
+
+        function handleAnswer(isCorrect) {
+            document.getElementById('question-modal').classList.add('hidden');
+            const p = players[currentPlayerIndex];
+
+            if (isCorrect) {
+                p.position += pendingMove;
+                if (p.position >= boardNodes.length - 1) {
+                    p.position = boardNodes.length - 1;
+                    updatePlayerPositions();
+                    showWinScreen(p);
+                    return;
+                }
+                showFeedback(`¡Correcto! ${p.name} avanza ${pendingMove} casilleros. ✨`, "bg-green-100 text-green-800 border-green-300");
+            } else {
+                showFeedback(`¡Casi! Respuesta incorrecta. ${p.name} se queda en el lugar. 💡`, "bg-amber-100 text-amber-800 border-amber-300");
+            }
+
+            updatePlayerPositions();
+            nextTurn();
+        }
+
+        function showFeedback(msg, cssClass) {
+            const fb = document.getElementById('feedback-msg');
+            fb.className = `p-4 rounded-xl text-center font-bold text-lg mb-4 border ${cssClass}`;
+            fb.innerText = msg;
+            fb.classList.remove('hidden');
+
+            setTimeout(() => {
+                fb.classList.add('hidden');
+            }, 2500);
+        }
+
+        function nextTurn() {
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            updateTurnUI();
+        }
+
+        function showWinScreen(player) {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('win-screen').classList.remove('hidden');
+            document.getElementById('winner-text').innerText = `🏆 ¡${player.name} ha ganado la partida!`;
+        }
+
+        function resetGame() {
+            document.getElementById('win-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
